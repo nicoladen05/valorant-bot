@@ -39,6 +39,9 @@ async def help(ctx):
 
     embed.add_field(name='.help', value='Shows this message', inline=True)
     embed.add_field(name='.info', value='Shows the bot\'s info', inline=True)
+    embed.add_field(name='.stats', value='Show general account stats', inline=True)
+    embed.add_field(name='.rank', value='Show a players current rank and elo', inline=True)
+    embed.add_field(name='.history', value='Show a players match history', inline=True)
     await ctx.send(embed=embed)
 
 
@@ -46,7 +49,7 @@ async def help(ctx):
 async def info(ctx):
     embed = discord.Embed(
         title="Info",
-        description="This bot was created by: <@!368090462659149826>",
+        description="This bot was created by: <@!368090462659149826> \n Github Repository: https://github.com/nicoladen05/valorant-bot",
         color=0x00ff00
     )
 
@@ -316,4 +319,5 @@ async def history(ctx, *, nametag):
         await ctx.send(embed=embed)
 
 
-client.run('OTc5ODI3MjExNjUxNjQ1NTAw.GbxAJm.3B5sv0vgimID0nvTKi9U_y7aL2xDoelOncOkB8')
+TOKEN = os.environ.get('TOKEN')
+client.run(TOKEN)
