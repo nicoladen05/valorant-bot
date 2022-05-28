@@ -1,2 +1,4 @@
 discord
 requests
+todoist-api-python
+feedparser
