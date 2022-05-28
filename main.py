@@ -217,7 +217,7 @@ async def history(ctx, *, nametag):
             # send title embed
             embed = discord.Embed(
                 title=name + "'s History",
-                color=0x00ff00
+                color=0x0000ff
             )
 
             # send embed
@@ -225,18 +225,15 @@ async def history(ctx, *, nametag):
     
             #make a for loop to get the metadata the last 5 games
             for i in range(0, 5):
-                embed = discord.Embed(
-                    color=0x00ff00
-                )
 
                 # get data from metadata
                 map = stats[i]['metadata']['map']
                 start_unix = stats[i]['metadata']['game_start']
                 mode = stats[i]['metadata']['mode']
 
-                # search for name in stats[i]['players']
+                # search for name in stats[i]['players'] and ignore capitalization
                 for j in range(0, len(stats[i]['players']['all_players'])):
-                    if stats[i]['players']['all_players'][j]['name'] == name:
+                    if stats[i]['players']['all_players'][j]['name'].lower() == name.lower():
                         player_stats = stats[i]['players']['all_players'][j]
                         break
                 
@@ -268,19 +265,30 @@ async def history(ctx, *, nametag):
                 rounds_won = stats[i]['teams'][str(player_team).lower()]['rounds_won']
                 rounds_lost = stats[i]['teams'][str(player_team).lower()]['rounds_lost']
 
+                # combine the score
+                score = str(rounds_won) + '-' + str(rounds_lost)
+
+                # change embed color depending on if the player has lost or won
+                if won:
+                    embed_color = 0x00ff00
+                else:
+                    embed_color = 0xff0000
+
+                embed = discord.Embed(
+                    color=embed_color
+                )
+
                 # make embed
                 embed.add_field(name='Map', value=map, inline=True)
                 embed.add_field(name='Mode', value=mode, inline=True)
                 embed.add_field(name='Time', value=f'<t:{start_unix}:R>', inline=True)
                 embed.add_field(name='Team', value=player_team, inline=True)
                 embed.add_field(name='Character', value=player_character, inline=True)
+                embed.add_field(name='Score', value=score, inline=True)
                 embed.add_field(name='Kills', value=kills, inline=True)
                 embed.add_field(name='Deaths', value=deaths, inline=True)
                 embed.add_field(name='Assists', value=assists, inline=True)
                 embed.add_field(name='Headshots', value=headshot_percent, inline=True)
-                embed.add_field(name='Won', value=won, inline=True)
-                embed.add_field(name='Rounds Won', value=rounds_won, inline=True)
-                embed.add_field(name='Rounds Lost', value=rounds_lost, inline=True)
                 embed.set_thumbnail(url=player_character_icon)
 
                 await ctx.send(embed=embed)
