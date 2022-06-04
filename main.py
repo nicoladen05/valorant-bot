@@ -1,4 +1,5 @@
 from ast import parse
+from tabnanny import check
 import discord
 from discord.ext import commands
 from requests import get
@@ -9,12 +10,20 @@ import os
 import time
 import sqlite3
 import feedparser
+from dotenv import load_dotenv
 from todoist_api_python.api import TodoistAPI
 
 # configuration
 announcements_channel_id = 980051595947544576
 
-client = commands.Bot(command_prefix='.')
+intents = discord.Intents.default()
+intents.members = True
+intents.presences = True
+
+client = commands.Bot(command_prefix='.', intents=intents)
+
+# load dotenv
+load_dotenv()
 
 # set firefox as the useragent
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:76.0) Gecko/20100101 Firefox/76.0'}
@@ -27,7 +36,7 @@ valorant_ranks = {
     4: 'Iron 2',
     5: 'Iron 3',
     6: 'Bronze 1',
-    7: 'Broneze 2',
+    7: 'Bronze 2',
     8: 'Bronze 3',
     9: 'Silver 1',
     10: 'Silver 2',
@@ -46,6 +55,43 @@ valorant_ranks = {
     23: 'Immortal 3',
     24: 'Radiant'
 }
+
+async def check_name(name, ctx):
+    # if name is a discord user
+    if name.startswith('<@') and name.endswith('>'):
+        # get their corresponding valorant name from the database
+        conn = sqlite3.connect('players.db')
+        c = conn.cursor()
+        try:
+            c.execute("SELECT ingame_name FROM players WHERE discord_name = ?", (name[2:-1],))
+            name = c.fetchone()[0]
+
+
+            # split name at #
+            name = name.split('#')
+
+            return name
+        # if the user is not in the database
+        except TypeError:
+            # embed you have to link your account
+            embed = discord.Embed(title='You have to link your account first!', description='Use `.link` to link your account.', color=0x00ff00)
+
+            # send the embed 
+            await ctx.send(embed=embed)
+
+            # return None
+            return 
+
+        conn.close()
+
+    # if name is a valorant name
+    else:
+        name = name.split('#')
+
+        # return name
+        return name
+
+
 
 @client.event
 async def on_ready():
@@ -190,11 +236,12 @@ async def help(ctx):
     embed.add_field(name='.help', value='Shows this message', inline=True)
     embed.add_field(name='.info', value='Shows the bot\'s info', inline=True)
     embed.add_field(name='.suggest', value='Suggests a new feature for the bot', inline=True)
-    embed.add_field(name='.stats', value='Show general account stats', inline=True)
+    embed.add_field(name='.stats ', value='Show general account stats', inline=True)
     embed.add_field(name='.rank', value='Show a players current rank and elo', inline=True)
     embed.add_field(name='.history', value='Show a players match history', inline=True)
     embed.add_field(name='.link', value='Links a discord account to a valorant account', inline=True)
     embed.add_field(name='.unlink', value='Unlinks a discord account from a valorant account', inline=True)
+    embed.add_field(name='.looking', value='Look for players that you can queue with', inline=True)
     await ctx.send(embed=embed)
 
 
@@ -212,11 +259,11 @@ async def info(ctx):
 @client.command()
 async def stats(ctx, *, nametag):
 
-    # split the nametag at the #
-    name_split = nametag.split('#')
+    check = await check_name(nametag, ctx)
 
-    name = name_split[0]
-    tag = name_split[1]
+    # split checkname nametag at #
+    name = check[0]
+    tag = check[1] 
 
 
     # make a get request
@@ -269,12 +316,11 @@ async def stats(ctx, *, nametag):
 # add a rank command
 @client.command()
 async def rank(ctx, *, nametag):
-    # split the nametag at the #
-    name_split = nametag.split('#')
+    check = await check_name(nametag, ctx)
 
-    name = name_split[0]
-    tag = name_split[1]
-
+    # split checkname nametag at #
+    name = check[0]
+    tag = check[1] 
 
     # make a get request
     url = 'https://api.henrikdev.xyz/valorant/v1/mmr/eu/' + name + '/' + tag
@@ -353,11 +399,11 @@ async def rank(ctx, *, nametag):
 # history command
 @client.command()
 async def history(ctx, *, nametag):
-    # split nametag into name and tag at #
-    name_split = nametag.split('#')
+    check = await check_name(nametag, ctx)
 
-    name = name_split[0]
-    tag = name_split[1]
+    # split checkname nametag at #
+    name = check[0]
+    tag = check[1] 
 
     # make a get request
     url = 'https://api.henrikdev.xyz/valorant/v3/matches/eu/' + name + '/' + tag
@@ -477,7 +523,7 @@ async def history(ctx, *, nametag):
 async def suggest(ctx, *, suggestion):
 
     # connect to todoist api
-    TODOIST_TOKEN = os.environ.get('TODOIST_TOKEN')
+    TODOIST_TOKEN = os.getenv('TODOIST_TOKEN')
     todoist = TodoistAPI(TODOIST_TOKEN)
 
     # add a task to todoist
@@ -539,7 +585,7 @@ async def link(ctx, *, link):
         rank = int(json_response['data']['currenttier'])
 
         # check if the player isnt already in the database
-        c.execute('''SELECT * FROM players WHERE discord_name = ?''', (ctx.author.name,))
+        c.execute('''SELECT * FROM players WHERE discord_name = ?''', (ctx.author.id,))
         result = c.fetchone()
 
         # if the player isnt in the database
@@ -622,5 +668,212 @@ async def unlink(ctx):
     conn.close()
 
 
-TOKEN = os.environ.get('TOKEN')
-client.run(TOKEN)
+# looking for players command
+@client.command()
+async def looking(ctx, stacksize_str=5):
+    # check if the author is in players database
+    conn = sqlite3.connect('players.db')
+    c = conn.cursor()
+
+    c.execute('''SELECT * FROM players WHERE discord_name = ?''', (ctx.author.id,))
+    result = c.fetchone()
+
+    players_messaged_list = []
+    players_found_list = []
+    players_denied_list = []
+
+    players_found = 0
+
+    # convert stacksize to int
+    stacksize = int(stacksize_str)
+
+    # if the author is in the database
+    if result != None:
+        print('player found in database')
+        if stacksize < 5 and stacksize > 0:
+            # check for other players online whose rank_int is at max 3 off the players rank
+            c.execute('''SELECT * FROM players WHERE rank_int - ? <= 3 OR rank_int - ? >= 3''', (result[2], result[2],))
+            result = c.fetchall()
+            print(result)
+
+            # check if players in result are online on discord
+            for player in result:
+
+                member = ctx.guild.get_member(int(player[0]))
+
+                print("checking if " + member.name + " is online")
+
+                print(member.status)
+
+                #if the user is online and isnt the message author
+                if str(member.status) == "online" and member.id != ctx.author.id:
+
+                    #add to players_messaged_list
+                    players_messaged_list.append(member.name)
+
+                    print(client.get_user(int(player[0])))
+                    # make an embed to dm to the player
+                    embed = discord.Embed(
+                        title="Player Found",
+                        description='<@!' + str(ctx.author.id) + '> is looking to play VALORANT with a team with a stack size of ' + str(stacksize) + '. To play with him react with .',
+                        color=0x00ff00
+                    )
+
+                    #add footer
+                    embed.set_footer(text="You are getting this message because you linked your VALORANT-Account in the NERD Universe server. To stop these messages please use the .unlink command")
+
+                    # send the embed as dm
+                    dm = await client.get_user(int(player[0])).send(embed=embed)
+                    await dm.add_reaction('\u2705')
+                    await dm.add_reaction('\u274C')
+
+                    # append users name to list 
+                    players_found_list.append(client.get_user(int(player[0])))
+                    players_found += 1
+
+
+
+                    #start a threaded loop that checks for reactions
+                    async def check_reactions():
+                        cache_dm = discord.utils.get(client.cached_messages, id=dm.id)
+                        while True:
+                            await asyncio.sleep(1)
+                            #check if the message has been reacted to
+                            if cache_dm.reactions:
+                                # check if the message has been reacted with the accept emoji
+                                if cache_dm.reactions[0].count == 2:
+                                    print('accepted')
+
+                                    # check if the message has been reacted with the deny emoji
+                                    await dm.delete()
+                                    
+                                    # add the player to the players_found_list
+                                    players_found_list.append(client.get_user(int(player[0]))) 
+
+
+                                    # send the embed
+                                    await ctx.send(embed=embed)
+
+                                if cache_dm.reactions[1].count == 2:
+                                    print('denied')
+                                    # delete the message
+                                    await dm.delete()
+
+                                    # add user to list of denied players
+                                    players_denied_list.append(client.get_user(int(player[0])))
+
+                                    break
+
+
+                    #threaded loop
+                    asyncio.run_coroutine_threadsafe(check_reactions(), client.loop)
+
+
+
+                    # if players_found is the same size as the stacksize exit the loop
+                    if len(players_found_list) >= int(stacksize) - 1: # enough players accepted
+                        # all players found
+
+                        # check if there are players in players_messages_list that arent in players_found_list
+                        for player in players_messaged_list:
+                            if player not in players_found_list:
+
+                                # add to list of players that were messaged but not found
+                                players_messaged_not_found.append(player)
+
+                                # message the player that they were denied (embed)
+                                embed = discord.Embed(
+                                    title="Denied!",
+                                    description='You were denied because you didnt react to the message in time',
+                                    color=0xff0000
+                                )
+
+                                # send the embed
+                                await client.get_user(int(player)).send(embed=embed)
+
+
+                        embed = discord.Embed(
+                            title="Players found!",
+                            description='The following players have been found to queue with:',
+                            color=0x00ff00
+                        )
+
+                        # add fields
+                        for player in players_found_list:
+                            embed.add_field(name=player.name, value="", inline=False)
+                        
+
+                        # send embed
+                        await ctx.send(embed=embed)
+
+
+
+                        break
+                    elif int(stacksize) - 1 > len(players_messaged_list): # to many players denied
+                        # embed not enough players found
+                        embed = discord.Embed(
+                            title="Not enough players found!",
+                            description='Too many players denied your request. Please try a lower stack size. (online players: ' + str(len(players_found_list)) + ')',
+                            color=0xff0000
+                        )
+
+                        # send embed
+                        await ctx.send(embed=embed)
+
+                        break
+            
+
+            # list of players who accepted the invite
+            accepted_players = []
+
+
+            # if players_found is one less than wished stacksize
+            if players_found == int(stacksize) - 1:
+                # send a dm to ever player 
+                # send a message that players are found
+                embed = discord.Embed(
+                    title="Players Found",
+                    description="There are " + str(players_found) + " players online which you could queue with. They have been notified via DM",
+                    color=0x00ff00
+                )
+
+                await ctx.send(embed=embed)
+
+            else:
+                        # embed not enough players found
+                        embed = discord.Embed(
+                            title="Not enough players found!",
+                            description='Not enough players online. Please try a lower stack size. (online players: ' + str(len(players_found_list)) + ')',
+                            color=0xff0000
+                        )
+
+                        # send embed
+                        await ctx.send(embed=embed)
+                
+
+
+
+        else:
+            print('error invalid stacksize')
+            #stacksize is not valid embed
+            embed = discord.Embed(
+                title="Error",
+                description="The stacksize you entered is not valid",
+                color=0xff0000
+            )
+
+            await ctx.send(embed=embed)
+
+    else:
+        # embed you have to link your account
+        embed = discord.Embed(
+            title="Error",  
+            description="You have not linked your Valorant account to Discord yet. Please do so by using the .link command",
+            color=0xff0000
+        )
+
+    # cleanup
+    conn.close()
+
+
+client.run(os.getenv('TOKEN'))
