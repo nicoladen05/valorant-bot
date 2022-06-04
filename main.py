@@ -96,7 +96,7 @@ async def check_name(name, ctx):
 @client.event
 async def on_ready():
     # change the bots status
-    await client.change_presence(activity=discord.Game(name='WIP | .help'))
+    await client.change_presence(activity=discord.Game(name='.help'))
 
     # print the bot's login message
     print('Logged in as')
@@ -104,7 +104,7 @@ async def on_ready():
     print(client.user.id)
     print('------')
 
-    # loop that gets run every 30 seconds
+    # loop that gets run every 15 minutes
     while True:
         # get all players from the database
         db = sqlite3.connect('players.db')
@@ -689,29 +689,28 @@ async def looking(ctx, stacksize_str=5):
 
     # if the author is in the database
     if result != None:
-        print('player found in database')
         if stacksize < 5 and stacksize > 0:
             # check for other players online whose rank_int is at max 3 off the players rank
             c.execute('''SELECT * FROM players WHERE rank_int - ? <= 3 OR rank_int - ? >= 3''', (result[2], result[2],))
             result = c.fetchall()
-            print(result)
 
             # check if players in result are online on discord
             for player in result:
-
-                member = ctx.guild.get_member(int(player[0]))
-
-                print("checking if " + member.name + " is online")
-
-                print(member.status)
+                check_member = ctx.guild.get_member(int(player[0]))
 
                 #if the user is online and isnt the message author
-                if str(member.status) == "online" and member.id != ctx.author.id:
+                if str(check_member.status) == "online" and check_member.id != ctx.author.id:
+
+                    member = ctx.guild.get_member(int(player[0]))
+                    user = client.get_user(member.id)
+                    rank = player[1]
+
 
                     #add to players_messaged_list
-                    players_messaged_list.append(member.name)
+                    players_messaged_list.append(user)
 
-                    print(client.get_user(int(player[0])))
+                    players_found += 1
+
                     # make an embed to dm to the player
                     embed = discord.Embed(
                         title="Player Found",
@@ -723,109 +722,98 @@ async def looking(ctx, stacksize_str=5):
                     embed.set_footer(text="You are getting this message because you linked your VALORANT-Account in the NERD Universe server. To stop these messages please use the .unlink command")
 
                     # send the embed as dm
-                    dm = await client.get_user(int(player[0])).send(embed=embed)
+                    dm = await user.send(embed=embed)
                     await dm.add_reaction('\u2705')
                     await dm.add_reaction('\u274C')
-
-                    # append users name to list 
-                    players_found_list.append(client.get_user(int(player[0])))
-                    players_found += 1
-
 
 
                     #start a threaded loop that checks for reactions
                     async def check_reactions():
                         cache_dm = discord.utils.get(client.cached_messages, id=dm.id)
+                        counter = 0
                         while True:
                             await asyncio.sleep(1)
+                            counter += 1
                             #check if the message has been reacted to
                             if cache_dm.reactions:
                                 # check if the message has been reacted with the accept emoji
                                 if cache_dm.reactions[0].count == 2:
-                                    print('accepted')
 
                                     # check if the message has been reacted with the deny emoji
                                     await dm.delete()
                                     
                                     # add the player to the players_found_list
-                                    players_found_list.append(client.get_user(int(player[0]))) 
+                                    players_found_list.append(user)
 
-
-                                    # send the embed
-                                    await ctx.send(embed=embed)
-
-                                if cache_dm.reactions[1].count == 2:
-                                    print('denied')
+                                if cache_dm.reactions[1].count == 2 or counter == 300:
                                     # delete the message
                                     await dm.delete()
 
                                     # add user to list of denied players
-                                    players_denied_list.append(client.get_user(int(player[0])))
+                                    players_denied_list.append(user)
 
-                                    break
+                    async def check_list():
+                        while True:
+                            await asyncio.sleep(3)
+                            # if players_found is the same size as the stacksize exit the loop
+                            if len(players_found_list) >= int(stacksize) - 1: # enough players accepted
+                                # all players found
+
+                                # check if there are players in players_messages_list that arent in players_found_list
+                                for player in players_messaged_list:
+                                    if player not in players_found_list:
+                                        # message the player that they were denied (embed)
+                                        embed = discord.Embed(
+                                            title="Denied!",
+                                            description='You were denied because you didnt react to the message in time',
+                                            color=0xff0000
+                                        )
+
+                                        # send the embed
+                                        await player.send(embed=embed)
+                                    else:
+                                        pass
+
+                                embed = discord.Embed(
+                                    title="Players found!",
+                                    description='The following players have been found to queue with:',
+                                    color=0x00ff00
+                                )
+
+                                # add fields
+                                for player in players_found_list:
+                                    embed.add_field(name=rank, value='<@!' + str(player.id) + '>', inline=False)
+
+                                # footer
+                                embed.set_footer(text="Please meet up in a VALORANT-Lobby")
+                                
+
+                                # send embed
+                                await ctx.send(embed=embed)
+
+                                break
+
+                            elif int(stacksize) - 1 <= len(players_denied_list): # to many players denied
+                                # embed not enough players found
+                                embed = discord.Embed(
+                                    title="Not enough players found!",
+                                    description='Too many players denied your request. Please try a lower stack size. (online players: ' + str(len(players_found_list)) + ')',
+                                    color=0xff0000
+                                )
+
+                                # send embed
+                                await ctx.send(embed=embed)
+
+                                conn.close()
+
+                                break
 
 
                     #threaded loop
                     asyncio.run_coroutine_threadsafe(check_reactions(), client.loop)
-
-
-
-                    # if players_found is the same size as the stacksize exit the loop
-                    if len(players_found_list) >= int(stacksize) - 1: # enough players accepted
-                        # all players found
-
-                        # check if there are players in players_messages_list that arent in players_found_list
-                        for player in players_messaged_list:
-                            if player not in players_found_list:
-
-                                # add to list of players that were messaged but not found
-                                players_messaged_not_found.append(player)
-
-                                # message the player that they were denied (embed)
-                                embed = discord.Embed(
-                                    title="Denied!",
-                                    description='You were denied because you didnt react to the message in time',
-                                    color=0xff0000
-                                )
-
-                                # send the embed
-                                await client.get_user(int(player)).send(embed=embed)
-
-
-                        embed = discord.Embed(
-                            title="Players found!",
-                            description='The following players have been found to queue with:',
-                            color=0x00ff00
-                        )
-
-                        # add fields
-                        for player in players_found_list:
-                            embed.add_field(name=player.name, value="", inline=False)
-                        
-
-                        # send embed
-                        await ctx.send(embed=embed)
-
-
-
-                        break
-                    elif int(stacksize) - 1 > len(players_messaged_list): # to many players denied
-                        # embed not enough players found
-                        embed = discord.Embed(
-                            title="Not enough players found!",
-                            description='Too many players denied your request. Please try a lower stack size. (online players: ' + str(len(players_found_list)) + ')',
-                            color=0xff0000
-                        )
-
-                        # send embed
-                        await ctx.send(embed=embed)
-
-                        break
+                    # another one of these threads will be running the  check_lists function
+                    asyncio.run_coroutine_threadsafe(check_list(), client.loop)
             
-
-            # list of players who accepted the invite
-            accepted_players = []
-
 
             # if players_found is one less than wished stacksize
             if players_found == int(stacksize) - 1:
@@ -854,7 +842,6 @@ async def looking(ctx, stacksize_str=5):
 
 
         else:
-            print('error invalid stacksize')
             #stacksize is not valid embed
             embed = discord.Embed(
                 title="Error",
