@@ -476,7 +476,6 @@ async def history(ctx, *, nametag):
     name = check[0]
     tag = check[1]
 
-    # make a get request
     url = "https://api.henrikdev.xyz/valorant/v3/matches/eu/" + name + "/" + tag
     response = get(url, headers=headers)
 

@@ -129,4 +129,6 @@ dmypy.json
 .pyre/
 
 # last message
+./last_post_date.txt
 last_post_date.txt
+
