@@ -364,6 +364,8 @@ async def rank(ctx, *, nametag):
 
 
             await ctx.send(embed=embed)
+
+            return
             
 
         embed = discord.Embed(
