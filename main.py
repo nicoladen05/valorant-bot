@@ -332,6 +332,39 @@ async def rank(ctx, *, nametag):
         json_response = json.loads(response.text)
 
         stats = json_response['data']
+        
+        # easter egg xd
+        if name == "nicoladen 鳩" and tag == "hart":
+            embed = discord.Embed(
+                title=name + "'s Rank",
+                color=0x00ff00
+            )
+            rank_int = int(stats['currenttier'])
+
+            rank_icon_url = f'https://media.valorant-api.com/competitivetiers/564d8e28-c226-3180-6285-e48a390db8b1/24/smallicon.png'
+
+            # set embed thumbnail
+            embed.set_thumbnail(url=rank_icon_url)
+
+
+            embed.add_field(name='Current Rank', value="Radiant", inline=True)
+
+
+            mmr = stats['mmr_change_to_last_game']
+            if mmr != None:
+                if mmr > 0:
+                    embed.add_field(name='Last Match', value='+' + str(mmr), inline=True)
+                elif mmr < 0:
+                    embed.add_field(name='Last Match', value=str(mmr), inline=True)
+
+            embed.add_field(name='Elo', value='∞', inline=True)
+
+            embed.add_field(name='Total Elo', value='∞', inline=True)
+
+
+
+            await ctx.send(embed=embed)
+            
 
         embed = discord.Embed(
             title=name + "'s Rank",
