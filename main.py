@@ -1,9 +1,6 @@
-from ast import parse
-from tabnanny import check
 import discord
 from discord.ext import commands
 from requests import get
-import random
 import asyncio
 import json
 import os
@@ -74,6 +71,8 @@ async def check_name(name, ctx):
             # split name at #
             name = name.split("#")
 
+            conn.close()
+
             return name
         # if the user is not in the database
         except TypeError:
@@ -87,10 +86,11 @@ async def check_name(name, ctx):
             # send the embed
             await ctx.send(embed=embed)
 
+            conn.close()
+
             # return None
             return
 
-        conn.close()
 
     # if name is a valorant name
     else:
