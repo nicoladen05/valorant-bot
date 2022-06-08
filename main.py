@@ -91,7 +91,6 @@ async def check_name(name, ctx):
             # return None
             return
 
-
     # if name is a valorant name
     else:
         name = name.split("#")
@@ -215,51 +214,51 @@ async def on_ready():
 
         db.close()
 
-        print("Checking for new articles")
-        # post an announcement to discord when a new post is added to an rss feed
-        # get the rss feed
-        url = "https://createfeed.fivefilters.org/extract.php?url=https%3A%2F%2Fplayvalorant.com%2Fen-us%2Fnews%2F&item=div%5Bclass%2A%3D%22NewsCard-module--featured%22%5D+a&item_title=img+%40alt&item_desc=p%5Bclass%2A%3D%22copy-02+NewsCard-module--description%22%5D&item_date=p%5Bclass%2A%3D%22copy-02+NewsCard-module--dateWrapper%22%5D+span%5Bclass%2A%3D%22NewsCard-module--published%22%5D&item_date_format=m%2Fd%2Fy&feed_title=Valorant+RSS+News&max=5&order=document&guid=url"
-        response = get(url, headers=headers)
-
-        # parse the rss feed
-        parsed_rss = feedparser.parse(response.text)
-
-        # store last_post_date in another file
-        with open("last_post_date.txt", "r") as f:
-            last_post_date = f.readline()
-            f.close
-
-        # check if the article has already been posted to the discord channel
-        for post in parsed_rss.entries:
-            # convert post.published to a unix timestamp
-            post_date = int(time.mktime(post.published_parsed))
-            if post_date > int(last_post_date):
-                print("New post found")
-
-                # get the title of the article
-                title = post.title
-
-                # get summary of the article
-                summary = post.summary
-
-                # get the link of the article
-                link = post.link
-
-                # make an embed message
-                embed = discord.Embed(title=title, description=link, color=0x00FF00)
-
-                # add embed field
-                embed.add_field(name="Summary", value=summary, inline=False)
-                embed.add_field(
-                    name="Published", value=f"<t:{post_date}:R>", inline=False
-                )
-
-                # send the message
-                await client.get_channel(announcements_channel_id).send(embed=embed)
-
-                with open("last_post_date.txt", "w") as f:
-                    f.write(str(post_date))
-                    f.close()
+        # print("Checking for new articles")
+        # # post an announcement to discord when a new post is added to an rss feed
+        # # get the rss feed
+        # url = "https://createfeed.fivefilters.org/extract.php?url=https%3A%2F%2Fplayvalorant.com%2Fen-us%2Fnews%2F&item=div%5Bclass%2A%3D%22NewsCard-module--featured%22%5D+a&item_title=img+%40alt&item_desc=p%5Bclass%2A%3D%22copy-02+NewsCard-module--description%22%5D&item_date=p%5Bclass%2A%3D%22copy-02+NewsCard-module--dateWrapper%22%5D+span%5Bclass%2A%3D%22NewsCard-module--published%22%5D&item_date_format=m%2Fd%2Fy&feed_title=Valorant+RSS+News&max=5&order=document&guid=url"
+        # response = get(url, headers=headers)
+        #
+        # # parse the rss feed
+        # parsed_rss = feedparser.parse(response.text)
+        #
+        # # store last_post_date in another file
+        # with open("last_post_date.txt", "r") as f:
+        #     last_post_date = f.readline()
+        #     f.close
+        #
+        # # check if the article has already been posted to the discord channel
+        # for post in parsed_rss.entries:
+        #     # convert post.published to a unix timestamp
+        #     post_date = int(time.mktime(post.published_parsed))
+        #     if post_date > int(last_post_date):
+        #         print("New post found")
+        #
+        #         # get the title of the article
+        #         title = post.title
+        #
+        #         # get summary of the article
+        #         summary = post.summary
+        #
+        #         # get the link of the article
+        #         link = post.link
+        #
+        #         # make an embed message
+        #         embed = discord.Embed(title=title, description=link, color=0x00FF00)
+        #
+        #         # add embed field
+        #         embed.add_field(name="Summary", value=summary, inline=False)
+        #         embed.add_field(
+        #             name="Published", value=f"<t:{post_date}:R>", inline=False
+        #         )
+        #
+        #         # send the message
+        #         await client.get_channel(announcements_channel_id).send(embed=embed)
+        #
+        #         with open("last_post_date.txt", "w") as f:
+        #             f.write(str(post_date))
+        #             f.close()
 
         await asyncio.sleep(900)
 
@@ -508,8 +507,6 @@ async def history(ctx, *, nametag):
                 ):
                     player_stats = stats[i]["players"]["all_players"][j]
                     break
-                else:
-                    return
 
             player_team = player_stats["team"]
             player_character = player_stats["character"]
