@@ -508,6 +508,8 @@ async def history(ctx, *, nametag):
                 ):
                     player_stats = stats[i]["players"]["all_players"][j]
                     break
+                else:
+                    return
 
             player_team = player_stats["team"]
             player_character = player_stats["character"]
